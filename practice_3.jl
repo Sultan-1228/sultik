@@ -50,7 +50,7 @@ function degree(n, p)
 end
 
 
-# № 4 ----------------------------------
+########################## Задача № 4 #######################
 function mean_dev(mass)
     T = eltype(mass)
     n = 0; s¹ = zero(T); s² = zero(T)
