@@ -1,127 +1,76 @@
-using BenchmarkTools
-# № 1 ----------------------------------
 
-function sort_perm!(a)
-    indexes = collect(firstindex(a):lastindex(a))
-    n = length(a)
-    for i in 1:n
-        for j in i:n
-            if a[i]>a[j]
-                a[i], a[j] = a[j], a[i]
-                indexes[i], indexes[j] = indexes[j], indexes[i]
-            end
-        end
-    end
-    return indexes
-end
- 
-sort_perm(a)=sort_perm!(copy(a))
+################################# Задача 1. Реализовать функции, аналогичные встроенным функциям sort, sort!, sortperm, sortperm! на основе алгоритма сортировки вставками.
+# При этом, при проектировании функциий, аналогичных функциям sort и sort!, требуется избежать повторного кодирования алгоритма сортировки.
+# То же относится и к проектированию пары функций, аналогичных функциям sortperm, sortperm!
 
-# № 2 ----------------------------------
-function bubble_sort!(a)
-    n = length(a)
-    for k in 1:n-1
-        istranspose = false
-        for i in 1:n-k
-            if a[i]>a[i+1]
-                a[i], a[i+1] = a[i+1], a[i]
-                istranspose = true
-            end
+# Сортировка вставками O( n^2 )
+function insert_sort!(array::AbstractVector{T})::AbstractVector{T} where T <: Number
+    n = 1
+    # Инвариант: срез array[1:n] - отсортирован
+
+    while n < length(array) 
+        n += 1
+        i = n
+
+        while i > 1 && array[i-1] > array[i]
+            array[i], array[i-1] = array[i-1], array[i]
+            i -= 1
         end
-        if istranspose == false
-            break
-        end
+
+        # Утверждение: array[1] <= ... <= array[n]
     end
-    return a
+
+    return array
 end
 
-function comb_sort!(a; factor=1.2473309)
-    step = length(a)
+insert_sort(array::AbstractVector)::AbstractVector = insert_sort!(copy(array))
+
+############################## Задача 2. Реализовать алгоритм сортировки "расчесыванием", который базируется на сортировке "пузырьком". Исследовать эффективность этого алгоритма в равнении с пузырьковой сортировкой (на больших массивах делать времннные замеры).
+
+# Сортировка расчёской O( n^2 )
+function comb_sort!(array::AbstractVector{T}, factor::Real=1.2473309) where T <: Number 
+    step = length(array)
+
     while step >= 1
-        for i in 1:length(a)-step
-            if a[i] > a[i+step]
-                a[i], a[i+step] = a[i+step], a[i]
+        for i in 1:length(array)-step
+            if array[i] > array[i+step]
+                array[i], array[i+step] = array[i+step], array[i]
             end
         end
         step = Int(floor(step/factor))
     end
-    bubble_sort!(a)
+
+    
+    bubble_sort!(array)
 end
 
-f = randn(1000)
-@time bubble_sort!(f)
-f = randn(1000)
-@time comb_sort!(f)
-#как мы видим, уже на 1000 элементах сортировка расчёсыванием перегоняет пузырьковую.
-#сложность пузырьковой O(n^2) во всех случаях, а у сортировки расчёсыванием в среднем же O(n^2/2^p)
+comb_sort(array::AbstractVector, factor::Real=1.2473309)::AbstractVector = comb_sort!(copy(array),factor)
 
+####################################### Задача 3. Реализовать алгоритм сортировки Шелла, который базируется на сортировке вставками.
+# Исследовать эффективность этого алгоритма в равнении с сортировкой вставками (на больших массивах делать времннные замеры).
 
-# № 3 ----------------------------------
+# Сортировка Шелла O( n^2 )
+function shell_sort!(array::AbstractVector{T})::AbstractVector{T} where T <: Number
+    n = length(array)
 
-function insert_sort!(vector)
-    n = 1
-    while n < length(vector) 
-        n += 1
-        i = n
-        while i > 1 && vector[i-1] > vector[i]
-            vector[i], vector[i-1] = vector[i-1], vector[i]
-            i -= 1
-        end
-    end
-    return vector
-end
+	
+    step_series = (n÷2^i for i in 1:Int(floor(log2(n)))) 
 
-function shell_sort!(a;  step_series = (length(a)÷2^i for i in 1:Int(floor(log2(length(a))))) )
     for step in step_series
-        for i in firstindex(a):lastindex(a)-step
-            j = i
-            while j >= firstindex(a) && a[j] > a[j+step]
-                a[j], a[j+step] = a[j+step], a[j]
-                j -= step
-            end
+        for i in firstindex(array):step-1
+            insert_sort!(@view array[i:step:end]) 
         end
     end
-    return a
+    return array
 end
 
-function shell_sort2(arr)
-    n = length(arr)
-    gap = div(n, 2)
-    
-    while gap > 0
-        for i = gap+1:n
-            temp = arr[i]
-            j = i
-            
-            while j > gap && arr[j-gap] > temp
-                arr[j] = arr[j-gap]
-                j -= gap
-            end
-            
-            arr[j] = temp
-        end
-        
-        gap = div(gap, 2)
-    end
-    
-    return arr
-end
+shell_sort(array::AbstractVector)::AbstractVector = shell_sort!(copy(array))
 
-#=
-f = rand(Int, 10000)
-@time shell_sort!(f)
-f = rand(Int, 10000)
-@time insert_sort!(f)
-=#
-#на значении в 10000 элементов сортировка шела становится быстрее сортировки вставками. 
-#сортировка шела немного лучше чем обычная сортировка вставками, работающая во всех случаях за O(n^2), 
-#так как это вероятностный алгоритм, в лучшем случае, который может выдавать даже O(n * (logn)^2)
+############################################ Задача 4. Реализовать алгоритм сортировки слияниями. Исследовать эффективность этого алгоритма в сравнении с предыдущми алгоритмами.
 
-# № 4 ----------------------------------
-
-@inline function Base.merge!(a1, a2, a3)::Nothing 
+@inline function Base.merge!(a1, a2, a3)::Nothing
     i1, i2, i3 = 1, 1, 1
-    @inbounds while i1 <= length(a1) && i2 <= length(a2) 
+    @inbounds while i1 <= length(a1) && i2 <= length(a2)
         if a1[i1] < a2[i2]
             a3[i3] = a1[i1]
             i1 += 1
@@ -132,161 +81,52 @@ f = rand(Int, 10000)
         i3 += 1
     end
     @inbounds if i1 > length(a1)
-        a3[i3:end] .= @view(a2[i2:end]) 
+        a3[i3:end] .= @view(a2[i2:end]) # Если бы тут было: a3[i3:end] = @view(a2[i2:end])
     else
         a3[i3:end] .= @view(a1[i1:end])
     end
     nothing
 end
 
-function merge_sort!(a)
-    b = similar(a) 
-    N = length(a)
-    n = 1 
-    @inbounds while n < N
-        K = div(N,2n) 
-        for k in 0:K-1
-            merge!(@view(a[(1:n).+k*2n]), @view(a[(n+1:2n).+k*2n]), @view(b[(1:2n).+k*2n]))
-        end
-        if N - K*2n > n
-            merge!(@view(a[(1:n).+K*2n]), @view(a[K*2n+n+1:end]), @view(b[K*2n+1:end]))
-        elseif 0 < N - K*2n <= n 
-            b[K*2n+1:end] .= @view(a[K*2n+1:end])
-        end
-        a, b = b, a
-        n *= 2
-    end
-    if isodd(log2(n)) 
-        b .= a 
-        a = b
-    end
-    return a
-end
-#=
-f = rand(Int, 100000)
-@time bubble_sort!(f)
-f = rand(Int, 100000)
-@time comb_sort!(f)
-f = rand(Int, 100000)
-@time shell_sort!(f)
-f = rand(Int, 100000)
-@time insert_sort!(f)
-f = rand(Int, 100000)
-@time merge_sort!(f)
-=#
-#видно, что на маленьких значениях сортировка слиянием показывает себя хуже, но на больших значениях она выигрывает, так как её сложность O(n*logn)
+# Сортировка слияниями O( n*log(n) )
+function merge_sort!(array::AbstractVector{T})::AbstractVector{T} where T <: Number
+	b = similar(array)
+	N = length(array)
+	n = 1
 
-# № 5 ----------------------------------
-function part_sort!(A, b)
-    N = length(A)
-    K=0
-    L=0
-    M=N
-    while L < M 
-        if A[L+1] == b
-            L += 1
-        elseif A[L+1] > b
-            A[L+1], A[M] = A[M], A[L+1]
-            M -= 1
-        else
-            L += 1; K += 1
-            A[L], A[K] = A[K], A[L]
-        end
-    end
-    return K, M+1 
+	@inbounds while n < N
+		K = div(N,2n) 
+		for k in 0:K-1
+			merge!(@view(array[(1:n).+k*2n]), @view(array[(n+1:2n).+k*2n]), @view(b[(1:2n).+k*2n]))
+		end
+		if N - K*2n > n 
+			merge!(@view(array[(1:n).+K*2n]), @view(array[K*2n+n+1:end]), @view(b[K*2n+1:end]))
+		elseif 0 < N - K*2n <= n 
+			b[K*2n+1:end] .= @view(array[K*2n+1:end])
+		end
+		array, b = b, array
+		n *= 2
+	end
+
+	if isodd(log2(n))
+		b .= array 
+		array = b
+	end
+
+	return array 
 end
 
-function quick_sort!(A)
-    if isempty(A)
-        return A
-    end
-    N = length(A)
-    K, M = part_sort!(A, A[rand(1:N)])
-    quick_sort!(@view A[1:K])
-    quick_sort!(@view A[M:N])
-    return A
+merge_sort(array::AbstractVector)::AbstractVector = merge_sort!(copy(array))
+
+
+
+################################################################## ЗАДАЧА 6. Реализовать вычисление медианы массива на основе процедуры Хоара.
+function median(array::AbstractVector{T})::T where T <: Number
+	quick_sort!(array)
+
+    if len(array) % 2 == 1
+        return array[len(array) / 2]
+    else
+        return 0.5 * (array[len(array) / 2 - 1] + l[len(array) / 2])
+	end
 end
-
-#=
-f = rand(Int, 10000000)
-@time comb_sort!(f)
-f = rand(Int, 10000000)
-@time shell_sort!(f)
-f = rand(Int, 10000000)
-@time merge_sort!(f)
-f = rand(Int, 10000000)
-@time quick_sort!(f)
-=#
-#в данной ситуации получилось, что сортировка хоара не настолько эффективна, как другие влоть до 1+e^6, но её эффективность раскрывается на больших значениях
-#так как её сложность в среднем равна O(N*log(N)) хоть и с достаточно большим коэфициентом 
-
-# № 6 ----------------------------------
-function findMedian(a, n)
-    if (n % 2 == 0)
-        part_sort!(a, n÷2)
-        part_sort!(a, (n - 1) ÷ 2)
-        return (a[(n - 1) ÷ 2] + a[n ÷ 2]) ÷ 2
-    else 
-        part_sort!(a, n÷2)
-        return a[n ÷ 2]
-    end
-end
-f = rand(Int, 1000)
-@time findMedian(f, length(f))
-
-
-# № 7 ----------------------------------
-function counting_sort!(arr::Vector{T}) where T <: Integer
-    max_val = maximum(arr)
-    count_arr = zeros(T, max_val + 1)
-    
-    for val in arr
-        count_arr[val + 1] += 1
-    end
-    for i in 2:length(count_arr)
-        count_arr[i] += count_arr[i-1]
-    end
-    sorted_arr = zeros(T, length(arr))
-    for val in arr
-        sorted_arr[count_arr[val + 1]] = val
-        count_arr[val + 1] -= 1
-    end
-    
-    return sorted_arr
-end
-
-x = rand(1:1000, 1000) 
-@time bubble_sort!(copy(x))
-@time comb_sort!(copy(x))
-@time insert_sort!(copy(x))
-@time shell_sort!(copy(x))
-@time merge_sort!(copy(x))
-@time quick_sort!(copy(x))
-@time counting_sort!(copy(x))
-println()
-f = rand(1:1000, 1000) 
-@time bubble_sort!(copy(f))
-@time comb_sort!(copy(f))
-@time insert_sort!(copy(f))
-@time shell_sort!(copy(f))
-@time merge_sort!(copy(f))
-@time quick_sort!(copy(f))
-@time counting_sort!(copy(f)) 
-println()
-m = rand(1:10000, 1000) 
-@time bubble_sort!(copy(m))
-@time comb_sort!(copy(m))
-@time insert_sort!(copy(m))
-@time shell_sort!(copy(m))
-@time merge_sort!(copy(m))
-@time quick_sort!(copy(m))
-@time counting_sort!(copy(m)) 
-println()
-d = rand(1:10000, 100000) 
-@time bubble_sort!(copy(d))
-@time comb_sort!(copy(d))
-@time insert_sort!(copy(d))
-@time shell_sort!(copy(d))
-@time merge_sort!(copy(d))
-@time quick_sort!(copy(d))
-@time counting_sort!(copy(d)) 
