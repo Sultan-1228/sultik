@@ -1,239 +1,215 @@
-import Base: +,-,*,cos,sin,angle,sign, display, acos, isless
-import LinearAlgebra: norm, dot
-using DataStructures
-include("practice_4.jl")
+using Plots
+using LinearAlgebra
 
-struct Vector2D{T<:Real}
-    x :: T
-    y :: T
+# 1. Спроектировать типы Vector2D и Segment2D с соответсвующими функциями.
+
+Vector2D{T <: Real} = NamedTuple{(:x, :y), Tuple{T,T}}
+
+Base. +(a::Vector2D{T},b::Vector2D{T}) where T = Vector2D{T}(Tuple(a) .+ Tuple(b))
+Base. -(a::Vector2D{T}, b::Vector2D{T}) where T = Vector2D{T}(Tuple(a) .- Tuple(b))
+Base. *(α::T, a::Vector2D{T}) where T = Vector2D{T}(α.*Tuple(a))
+
+# norm(a) - длина вектора, эта функция опредедена в LinearAlgebra
+LinearAlgebra.norm(a::Vector2D) = norm(Tuple(a))
+
+# dot(a,b)=|a||b|cos(a,b) - скалярное произведение, эта функция определена в LinearAlgebra
+LinearAlgebra.dot(a::Vector2D{T}, b::Vector2D{T}) where T = dot(Tuple(a), Tuple(b))
+
+Base. cos(a::Vector2D{T}, b::Vector2D{T}) where T = dot(a,b)/norm(a)/norm(b)
+
+
+xdot(a::Vector2D{T}, b::Vector2D{T}) where T = a.x*b.y-a.y*b.x
+
+Base.sin(a::Vector2D{T}, b::Vector2D{T}) where T = xdot(a,b)/norm(a)/norm(b)
+Base.angle(a::Vector2D{T}, b::Vector2D{T}) where T = atan(sin(a,b),cos(a,b))
+Base.sign(a::Vector2D{T}, b::Vector2D{T}) where T = sign(sin(a,b))
+
+Segment2D{T <: Real} = NamedTuple{(:A, :B), NTuple{2,Vector2D{T}}}
+
+
+stored_lims = [0,0,0,0]
+
+function lims!(x1,y1,x2,y2)
+	stored_lims[1] = min(x1-1,stored_lims[1])
+	stored_lims[2] = min(y1-1,stored_lims[2])
+	stored_lims[3] = max(x2+1,stored_lims[3])
+	stored_lims[4] = max(y2+1,stored_lims[4])
+
+	xlims!(stored_lims[1], stored_lims[3])
+	ylims!(stored_lims[2], stored_lims[4])
 end
 
-+(a :: Vector2D{T}, b :: Vector2D{T}) where T = Vector2D{T}(a.x+b.x,a.y+b.y)
--(a :: Vector2D{T}, b :: Vector2D{T}) where T = Vector2D{T}(a.x-b.x,a.y-b.y)
-*(a :: Vector2D{T}, b :: Vector2D{T}) where T = Vector2D{T}(a.x*b.x,a.y*b.y)
-cos(a :: Vector2D{T}, b :: Vector2D{T}) where T = sign(dot(a,b))*min(abs(dot(a,b)/(norm(a)*norm(b))),1)
-sin(a :: Vector2D{T}, b :: Vector2D{T}) where T = xdot(a,b)/(norm(a)*norm(b))
-norm(a :: Vector2D{T}) where T = norm((a.x,a.y))
-dot(a :: Vector2D{T}, b :: Vector2D{T}) where T = a.x*b.x+a.y*b.y
-xdot(a :: Vector2D{T}, b :: Vector2D{T}) where T = a.x*b.y-a.y*b.x
-angle(a :: Vector2D{T}, b :: Vector2D{T}) where T = atan(sin(a,b)/cos(a,b))
-sign(a :: Vector2D{T}, b :: Vector2D{T}) where T = sign(xdot(a,b))
-display(a :: Vector2D{T}) where T = display((a.x,a.y))
-acos(a :: Vector2D{T}, b :: Vector2D{T}) where T = acos(cos(a,b))
-subangle(a :: Vector2D{T}, b :: Vector2D{T}, centre :: Vector2D{T}) where T = return acos(cos(a-centre,b-centre))
+lims!(x,y) = lims!(x,y,x,y)
 
-struct Segment2D{T <: Real}
-    p1 :: Vector2D{T}
-    p2 :: Vector2D{T}
-    Segment2D{T}(p1 :: NTuple{2,T}, p2 :: NTuple{2,T}) where T<:Real = new{T}(Vector2D(p1...),Vector2D(p2...))
-    Segment2D{T}(p1 :: Vector2D{T}, p2 :: Vector2D{T}) where T <:Real = new{T}(p1,p2)
+function draw(vertices::AbstractArray{Vector2D{T}}) where T
+	vertices = copy(vertices)
+	push!(vertices,first(vertices))
+
+	x = [v.x for v in vertices]
+	y = [v.y for v in vertices]
+
+	plot(x, y, color=:blue, legend=false)
+
+	lims!( minimum(x) , minimum(y) , maximum(x) , maximum(y) )
 end
 
-includes(line :: Segment2D{T}, p :: Vector2D{T}) where T = min(line.p1.x,line.p2.x)<=p.x<=max(line.p1.x,line.p2.x) && min(line.p1.y,line.p2.y)<=p.y<=max(line.p1.y,line.p2.y)
+function draw(point::Segment2D{T}) where T
+	plot([point.A.x,point.B.x], [point.A.y,point.B.y], color=:yellow, legend=false)
 
-function sameside(line :: Segment2D{T}, p1 :: Vector2D{T}, p2 :: Vector2D{T}) :: Bool where T
-    origin = line.p2-line.p1
-    return sign(origin,p1 - line.p1) * sign(origin,p2 - line.p1)>=0
+	lims!( min(point.A.x,point.B.x) , min(point.A.y,point.B.y) , max(point.A.x,point.B.x) , max(point.A.y,point.B.y) )
 end
 
-function sameside(f :: Function, p1 :: Vector2D{T}, p2 :: Vector2D{T}) :: Bool where T
-    return sign(f(p1.x,p1.y)) == sign(f(p2.x,p2.y)) || sign(f(p1.x,p1.y))*sign(f(p2.x,p2.y))==0
+function draw(point::Vector2D{T}) where T
+	scatter!([point.x,point.x], [point.y,point.y], color=:red, markersize=5, legend=false)
+
+	lims!( point.x , point.y )
 end
 
-function intersection(line1 :: Segment2D{T}, line2 :: Segment2D{T}) where T<: Real
-    𝚫x1 :: Float64,𝚫y1 :: Float64 = line1.p2.x-line1.p1.x, line1.p2.y-line1.p1.y
-    𝚫x2 :: Float64,𝚫y2 :: Float64 = line2.p2.x-line2.p1.x, line2.p2.y-line2.p1.y
-    M = [𝚫y1 -𝚫x1
-         𝚫y2 -𝚫x2]
-    B = [line1.p1.x*𝚫y1-line1.p1.y*𝚫x1
-         line2.p1.x*𝚫y2-line2.p1.y*𝚫x2
-        ]
-    if det(M) == 0
-        if rang(M) == rang([M B])
-            @warn("линии совпадают")
+function clear()
+	fill!(stored_lims,0)
+
+	xlims!(0,1)
+	ylims!(0,1)
+
+	plot!()
+end
+
+
+# 2. Написать функцию, проверяющую, лежат ли две заданные точки по одну сторону от заданной прямой (прямая задается некоторым содержащимся в ней отрезком).
+function oneside(P::Vector2D{T}, Q::Vector2D{T}, s::Segment2D{T})::Bool where T
+	# l - направляющий вектор прямой
+	l = s.B - s.A
+
+	# Тогда, точки , лежат по одну сторону от прямой <=> когда угол между векторами имеют один и тот же знак (отложены в одну и ту же сторону от прямой)
+	return sin(l, P-s.A) * sin(l,Q-s.A) > 0
+end
+
+# 3. Написать функцию, проверяющую, лежат ли две заданные точки по одну сторону от заданной кривой (кривая задается уравнением вида F(x,y) = 0).
+oneside(F::Function, P::Vector2D, Q::Vector2D)::Bool =
+	( F(P...) * F(Q...) > 0 )
+
+# 4. Написать функцию, возвращающую точку пересечения (если она существует) двух заданных отрезков.
+isinner(P::Vector2D, s::Segment2D)::Bool =
+	(s.A.x <= P.x <= s.B.x || s.A.x >= P.x >= s.B.x) &&
+	(s.A.y <= P.y <= s.B.y || s.A.y >= P.y >= s.B.y)
+
+function intersection(s1::Segment2D{T},s2::Segment2D{T})::Union{Vector2D{T},Nothing} where T
+	A = [s1.B[2]-s1.A[2] s1.A[1]-s1.B[1]
+		s2.B[2]-s2.A[2] s2.A[1]-s2.B[1]]
+
+	b = [s1.A[2]*(s1.A[1]-s1.B[1]) + s1.A[1]*(s1.B[2]-s1.A[2])
+		s2.A[2]*(s2.A[1]-s2.B[1]) + s2.A[1]*(s2.B[2]-s2.A[2])]
+
+	x,y = A\b
+
+	
+	if isinner((;x, y), s1)==false || isinner((;x, y), s2)==false
+		return nothing
+	end
+
+	return (;x, y) #Vector2D{T}((x,y))
+end
+
+println("Пересечение: ",intersection( (A=(x=-1.0,y=-1.0),B=(x=1.0,y=2.0)) , (A=(x=1.0,y=-1.0),B=(x=-1.0,y=3.0)) ))
+
+
+
+# 5. Написать функцию, проверяющую лежит ли заданная точка внутри заданного многоугольника.
+function isinside(point::Vector2D{T},polygon::AbstractArray{Vector2D{T}})::Bool where T
+	@assert length(polygon) > 2
+
+	sum = zero(Float64)
+
+	# Вычислить алгебраическую (т.е. с учетом знака) сумму углов, между направлениями из заданной точки на каждые две сосоедние вершины многоугольника.
+	# Далее воспользоваться тем, что, если полученная сумма окажется равнной нулю, то точка лежит вне многоугольника, а если она окажется равной 360 градусам, то - внутри.
+	for i in firstindex(polygon):lastindex(polygon)
+		sum += angle( polygon[i] - point , polygon[i % lastindex(polygon) + 1] - point )
+	end
+	
+	return abs(sum) > π
+end
+
+println("Внутри: ",isinside( (x=0,y=0),[(x=0,y=1),(x=1,y=-1),(x=-1,y=-1)] ))
+println("Внутри: ",isinside( (x=5,y=0),[(x=0,y=1),(x=1,y=-1),(x=-1,y=-1)] ))
+
+# 6. Написать функцию, проверяющую, является ли заданный многоугольник выпуклым.
+function isconvex(polygon::AbstractArray{Vector2D{T}})::Bool where T
+	@assert length(polygon) > 2
+
+	for i in firstindex(polygon):lastindex(polygon)
+		# У выпуклого многоугольника все внутренние углы будут меньше 180 градусов.
+		# А у не выпуклого многоугольника обязательно найдутся, как углы меньшие, так и большие 180 градусов
+		if angle( polygon[i > firstindex(polygon) ? i - 1 : lastindex(polygon)] - polygon[i] , polygon[i % lastindex(polygon) + 1] - polygon[i] ) >= π
+			return false
+		end
+	end
+	
+	return true
+end
+
+println("Выпуклый: ",isconvex( [
+		(x=0,y=1),
+		(x=1,y=-1),
+		(x=-1,y=-1)
+	] ))
+
+
+# 8. Написать функцию, реализующую алгоритм Грехома построения выпуклой оболочки заданных точек плоскости.
+function grekhom!(points::AbstractArray{Vector2D{T}})::AbstractArray{Vector2D{T}} where T
+	ydata = (points[i].y for i in firstindex(points):lastindex(points))
+
+    i_start = findmin(ydata)
+
+    points[begin], points[i_start[2]] = points[i_start[2]], points[begin]
+
+    sort!(@view(points[begin + 1:end]), by=(point -> angle(point, (x=oneunit(T), y=zero(T)))))
+
+    push!(points, points[begin])
+
+    convex = [firstindex(points), firstindex(points) + 1, firstindex(points) + 2]
+
+    for i in firstindex(points)+3:lastindex(points)
+        while length(convex) > 1 && sign(points[i] - points[convex[end-2]], points[convex[end-1]] - points[convex[end-2]]) < 0
+            pop!(convex)
         end
-        return nothing
+
+        push!(convex, i)
     end
 
-    p = Vector2D{T}(M\B...)
+   	pop!(convex)
 
-    if includes(line1,p) && includes(line2,p)
-        return p
-    end
-
-    return nothing
+    return points[convex]
 end
 
-struct Polygon{T<:Real}
-    points :: Vector{Vector2D{T}}
-    Polygon{T}(points :: AbstractVector{Vector2D{T}}) where T<:Real = new{T}(points)
+
+grekhom!(points::AbstractArray{Vector2D}) = jarvis!(points::AbstractArray{Vector2D})
+
+println("Алгоритм Грехома: ", grekhom!( [
+		(x=0.0,y=0.0),
+		(x=5.0,y=1.0),
+		(x=4.0,y=3.0),
+		(x=1.0,y=9.0),
+		(x=-3.0,y=8.0),
+		(x=-5.0,y=2.0),
+		(x=-2.0,y=3.0),
+	] ) )
+
+# 9. Написать функцию вычисляющую площадь (ориентированную) заданного многоугольника методом трапеций.
+function area_trapeze(poly::AbstractArray{Vector2D{T}})::T where T
+    res = zero(T)
+
+	# area = (yk + yk+1)(xk+1 − xk)/2
+    for i in firstindex(poly):lastindex(poly)-1
+        res += (poly[i].y + poly[i+1].y) * (poly[i+1].x - poly[i].x) / 2
+    end
+
+    return res
 end
 
-function insidepolygon(p :: Vector2D{T}, poly :: Polygon{T}) where T<:Real
+println("Площадь (Трапеция): ",area_trapeze( [
+	(x=2.0,y=-1.0),
+	(x=1.0,y=2.0),
+	(x=-1.0,y=3.0),
+	(x=-3.0,y=-1.0),
+] ))
 
-    sum_angle :: T = zero(T)
-    N = length(poly.points)
-
-    for i in 1:N
-        p1 = poly.points[max(mod(i+1,N+1),1)]
-        p2 = poly.points[i]
-        sum_angle+=sign(p1-p,p2-p)*subangle(p1, p2, p)
-    end
-
-    return abs(sum_angle)>pi
-end
-
-function convex(poly :: Polygon{T}) where T
-    N = length(poly.points)
-    p1 = poly.points[N] - poly.points[begin]
-    p2 = poly.points[2] - poly.points[begin]
-    ind = sign(p2,p1)
-    for i in 1:N-1
-        p1 = poly.points[i] - poly.points[i+1]
-        p2 = poly.points[max(mod(i+2,N+1),1)] - poly.points[i+1]
-        if sign(p2,p1)!=ind
-            return false
-        end
-    end
-    return true
-end
-
-function Jarvis(points :: AbstractVector{Vector2D{T}}) :: Polygon{T} where T<:Real
-    pivot :: Vector2D = points[1];
-    for point in points
-        if point.x>pivot.x
-            pivot = point
-        end
-    end
-    polygon = Polygon{T}([pivot])
-    orientation = Vector2D{Real}(1,0)
-    function nextpoint(_pivot :: Vector2D{T}, _orientation :: Vector2D{Real}) where T
-        minang = 2pi
-        next = _pivot
-        for point in points
-            ang = acos(cos(_orientation,point-_pivot))
-            if sign(_orientation,point-_pivot)<0 ang=2pi - ang end
-            if ang-minang == 0 && point.x<next.x && point.y<next.y
-                next = point
-            end
-            if ang<minang && point != _pivot
-                minang = ang
-                next = point
-            end
-        end
-        return next, next - _pivot
-    end
-    pivot, orientation = nextpoint(pivot, orientation)
-    while polygon.points[begin]!=pivot
-        push!(polygon.points,pivot)
-        pivot, orientation = nextpoint(pivot, orientation)
-    end
-    return polygon
-end
-
-function Grekhom(points :: AbstractVector{Vector2D{T}}) :: Polygon{T} where T<:Real
-    pivot :: Vector2D = points[1];
-    for point in points
-        if point.y<pivot.y
-            pivot = point
-        end
-    end
-    orientation = Vector2D{Real}(1,0)
-    sorted_points = [(0.,pivot)]
-    for point in [p for p in points if p!=sorted_points[begin][2]]
-        ang = acos(cos(orientation,point-pivot))
-        if sign(orientation,point-pivot)<0 ang=2pi-ang end
-        push!(sorted_points,(ang,point))
-    end
-    sort!(sorted_points, lt = lessangpoint )
-
-    stack = Vector{Vector2D{Real}}()
-    push!(stack,sorted_points[1][2])
-    push!(stack,sorted_points[2][2])
-    i = 3
-
-    while i<=length(sorted_points)
-        push!(stack,sorted_points[i][2])
-        j = length(stack)
-        while j>=3
-            if sign(stack[j]-stack[j-1],stack[j-2]-stack[j-1])<0
-                stack[j], stack[j-1] = stack[j-1], stack[j]
-                pop!(stack)
-            end
-            j-=1
-        end
-        i+=1
-    end
-    return Polygon{Real}(stack)
-end
-
-function lessangpoint(a, b, eps = 1e-8)
-    a[1]-b[1]>eps && return false
-    a[1]-b[1]<-eps && return true
-    return a[2].x<b[2].x && a[2].y<b[2].y
-end
-
-function trapezoidarea(poly :: Polygon{T}) where T
-    area :: Float64 = 0
-    N = length(poly.points)
-    for i in 1:N
-        area+= (poly.points[max(mod(i+1,N+1),1)].x-poly.points[i].x)*(poly.points[max(mod(i+1,N+1),1)].y+poly.points[i].y)/2
-    end
-    return area
-end
-
-function trianglearea(poly :: Polygon{T}) where T
-    area :: Float64 = 0
-    N = length(poly.points)
-    for i in 1:N
-        #println(sign(poly.points[max(mod(i+1,N+1),1)],poly.points[i]))
-        area+= xdot(poly.points[max(mod(i+1,N+1),1)],poly.points[i])/2
-    end
-    return area
-end
-
-function drawpoints(arr :: Vector{Vector2D{T}}) where T<:Real
-    x = []
-    y = []
-    for point in arr
-        push!(x,point.x)
-        push!(y,point.y)
-    end
-    r = scatter!(x,y)
-    return r
-end
-
-function drawpolygon(poly :: Polygon{T}) where T<:Real
-    x = []
-    y = []
-    for point in poly.points
-        push!(x,point.x)
-        push!(y,point.y)
-    end
-    push!(x,poly.points[begin].x)
-    push!(y,poly.points[begin].y)
-    r = plot!(x,y)
-    return r
-end
-
-function drawline(line :: Segment2D{T}) where T<:Real
-    x = []
-    y = []
-    push!(x,line.p1.x)
-    push!(y,line.p1.y)
-    push!(x,line.p2.x)
-    push!(y,line.p2.y)
-    r = plot!(x,y)
-    return r
-end
-
-function drawfunc(f :: Function,a :: Real, b :: Real)
-    x = range(a,b,100)
-    y = []
-    for _x in x
-        push!(y, f(_x))
-    end
-    r = plot!(x,y)
-    return r
-
-end
