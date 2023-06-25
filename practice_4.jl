@@ -1,152 +1,146 @@
-# using Plots
-include("practice_2.jl")
-using LinearAlgebra
+#=
+1. Написать функцию, вычисляющую n-ю частичную сумму ряда Телора
+(Маклорена) функции для произвольно заданного значения аргумента x.
+Сложность алгоритма должна иметь оценку .
+=#
 
-
-# № 1 ----------------------------------
-function macloren_e_x(x :: Float64, n :: Int, eps :: Float64 = 1e-7)
-    S :: Float64 = 1.
-    a :: Float64 = abs(x)
-    k :: Int = 2
-    while k-2<n && S+a!=S && abs(a)>eps
-        S+=a
-        a = a*abs(x)/k
-        k+=1
+function exp_partial_sum(x::Real, n::Int)
+    sum = 0.0
+    term = 1.0
+    for i in 0:n
+        sum += term
+        term *= x / (i + 1)
     end
-    x<0 && return 1/S
-    return S
+    return sum
 end
 
-# № 2 ----------------------------------
-function exp_(x::Float64)#e^x
-    S :: Float64 = 1
-    negative :: Bool = x<0
-    if abs(x)>1
-        S = fast_pow(exp_(1.), Int(trunc(abs(x))))
-        x -= trunc(x)
+println(exp_partial_sum(5.0, 6))
+
+#=
+2. Написать функцию, вычиляющую значение с машинной точностью (с
+максимально возможной в арифметике с плавающей точкой).
+=#
+
+function exp_with_max_precision(x) ####
+    y = 1.0
+    term = 1.0
+    k = 1
+    while y + term != y ######
+        term *= x / k
+        y += term
+        k += 1
     end
-    S1 :: Float64 = 1
-    a :: Float64 = abs(x)
-    k :: Int = 2
-    while S1+a!=S1
-        S1+=a
-        a = a*abs(x)/k
-        k+=1
+    return y
+end
+
+println(exp_with_max_precision(5.0))
+
+#=
+3. Написать функцию, вычисляющую функцию Бесселя (обобщение функции синуса, колебание струны 
+с переменным толщеной, натяжением) 
+заданного целого неотрицательного порядка по ее ряду Тейлора с машинной точностью. Для
+этого сначала вывести соответствующую рекуррентную формулу,
+обеспечивающую возможность эффективного вычисления. Построить
+семейство графиков этих функций для нескольких порядков, начиная с нулевого
+порядка.
+=#
+
+#j(x) = (x/2)^j * sum((-1)^k / (k! * (j + k)!) * (x/2)^(2k), k=0:inf)
+#j - порядок, x - аргумент
+using Plots
+function bessel(M::Integer, x::Real)
+    sqrx = x*x
+    a = 1/factorial(M)
+    m = 1
+    s = 0 
+    
+    while s + a != s
+        s += a
+        a = -a * sqrx /(m*(M+m)*4)
+        m += 1
     end
     
-    negative && return 1/(S*S1)
-    return S*S1
-end
-# № 3 ----------------------------------
-function bessel(x,α)
-    α *= (-1) ^ (α < 0)
-    s = 0.0; a = ((x/2)^α)/factorial(α); k = 0;
-    while (s+a)!=s
-        s+=a
-        a = (a*(-1)*(fast_pow((x/2),2)))/((k+1)*(k+α+1))
-        k+=1
-    end
-    return s
-end
-# № 4 ----------------------------------
-function reverse_gauss1(A::AbstractMatrix{T}, b::AbstractVector{T}) where T
-    x = similar(b)
-    N = size(A, 1)
-    for k in 0:N-1
-    x[N-k] = (b[N-k] - sum(A[N-k,N-k+1:end] .* x[N-k+1:end])) / A[N-k,N-k]
-    end
-    return x
-   end
-
-function reverse_gauss2(A::AbstractMatrix{T}, b::AbstractVector{T}) where T
-    x = similar(b)
-    N = size(A,1)
-    for k in 0:N-1
-        @views x[N-k] = (b[N-k] - sum(A[N-k,N-k+1:end] .* x[N-k+1:end])) / A[N-k,N-k]
-    end
-    return x
+    return s*(x/2)^M
 end
 
-function swap!(A,B)
-    for i in eachindex(A)
-        A[i],B[i] = B[i], A[i]
-    end
+values = 0:0.1:20
+myPlot = plot()
+for m in 0:5
+	plot!(myPlot, values, bessel.(m, values))
 end
+display(myPlot)
 
-# № 5 ----------------------------------
-function transform_to_steps!(A::AbstractMatrix; epsilon = 1e-7,degenerate_exeption = true)
-    @inbounds for k in 1:size(A,1)
-        absval, dk = findmax(abs,@view(A[k:end,k]))#max element -> index
-        (degenerate_exeption && absval <= epsilon) && throw("вырожденная матрица")
-        dk > 1 && swap!(@view(A[k,k:end]),@view(A[k+dk-1,k:end]))
-        for i in k+1:size(A,1)
-            t = A[i,k]/A[k,k]
-            @. @views A[i,k:end] = A[i,k:end] - t * A[k,k:end]#без точек будет копия при всех операциях
-            #@. - расставляет точки во всех местах
+
+
+#=
+4. Реализовать алгорим, реализующий обратный ход алгоритма Жордана-Гаусса
+=#
+using LinearAlgebra
+function shordan_gauss(A::AbstractMatrix{T}, b::AbstractVector{T})::AbstractVector{T} where T
+    @assert size(A, 1) == size(A, 2)
+    n = size(A, 1) 
+    x = zeros(T, n)
+
+    for i in n:-1:1
+        x[i] = b[i]
+        for j in i+1:n
+            x[i] =fma(-x[j] ,A[i,j] , x[i])
         end
+        x[i] /= A[i,i]
     end
-    return A
+    return x
 end
 
-# № 6, 7 ----------------------------------
-function solve_slae1(A::AbstractMatrix{T},b::AbstractMatrix{T}) where T
-    Ab = [A b] # hcat(A,b)
-    transform_to_steps!(Ab)#lengthxlength
-    svob = Ab[:,end]
-    nesvob = Ab[:,1:(end-1)]
-    return reverse_gauss1(nesvob,svob)#
-end
-function solve_slae2(A::AbstractMatrix{T},b::AbstractMatrix{T}) where T
-    Ab = [A b] # hcat(A,b)
-    transform_to_steps!(Ab)#lengthxlength
-    svob = Ab[:,end]
-    nesvob = Ab[:,1:(end-1)]
-    return reverse_gauss2(nesvob,svob)#
+#=
+5. Реализовать алгоритм, осуществляющий приведение матрицы матрицы к ступенчатому виду
+=#
+function TransformToSteps!(matrix::AbstractMatrix, epsilon::Real = 1e-7)::AbstractMatrix
+	@inbounds for k ∈ 1:size(matrix, 1)
+		absval, Δk = findmax(abs, @view(matrix[k:end,k]))
+
+		(absval <= epsilon) && throw("Вырожденая матрица")
+
+		Δk > 1 && swap!(@view(matrix[k,k:end]), @view(matrix[k+Δk-1,k:end]))
+
+		for i ∈ k+1:size(matrix,1)
+			t = matrix[i,k]/matrix[k,k]
+			@. @views matrix[i,k:end] = matrix[i,k:end] - t * matrix[k,k:end] # Макрос @. используется вместо того, чтобы в соответсвующей строчке каждую операцию записывать с точкой
+		end
+	end
+
+	return matrix
 end
 
-# № 8 ----------------------------------
+#8. Написать функцию, возвращающую ранг произвольной прямоугольной матрицы (реализуется на базе приведения матрицы к ступенчатому виду).
+function rank!(matrix::AbstractMatrix{T},epsilon::Real = 1e-7) where T
+    TransformToSteps!(Matrix)
+    
+	i = 1
 
-function rank(A::AbstractMatrix{T}) where T
-    B = transform_to_steps!(A)
-    nulls = 0
-    for i in 1:size(B,1)
-        nulls += (B[i,i] == 0)
+    while abs(matrix[i,i]) <= epsilon
+        i+=1
     end
-    return size(B,1) - nulls
+
+    return i-1
 end
-# № 9 ----------------------------------
-function det_(A::AbstractMatrix{T}) where T
-    B = transform_to_steps!(A)
-    mult = 1
-    for i in 1:size(B,1)
-        mult *= B[i,i]
+
+#9. Написать функцию, возвращающую определитель произвольной квадратной матрицы (реализуется на основе приведения матрицы к ступенчатому виду).
+function determinant!(matrix::AbstractMatrix{T}) where T
+	#макрос @assert для проверки квадратной матрицы
+    TransformToSteps!(matrix)
+
+    det = oneunit(T)
+    i = 1
+
+    while i <= size(matrix, 1)
+		if matrix[i, i] == zero(T)
+			break
+		end
+	
+		det *= matrix[i, i]
+		
+		i += 1
     end
-    return mult
-end
 
-@time begin
-a = Float64[1 2 3;
-            1 1 0;
-            4 0 1]
-c = Float64[2,4,6]
-
-N = 100
-A = randn(N,N)
-println(det_(A))
-det(A)
+    return det
 end
-A = randn(N,N)
-B = randn(N, 1)
-@time begin
-    z1 = solve_slae1(copy(A), copy(B))
-end
-@time begin
-    z2 = solve_slae2(copy(A), copy(B))
-end
-@time begin
-    z1 = solve_slae1(copy(A), copy(B))
-end
-@time begin
-    z2 = solve_slae2(copy(A), copy(B))
-end
-println(z1==z2)
