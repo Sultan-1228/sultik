@@ -117,6 +117,3 @@ import Base: +, -, *, show
 -(a::Polynom{T}) where {T<:Number} = Polynom{T}(-a.coeffs)
 end
 
-# Кортеж коэффицентов
-
-K = Z{Polynom{Int}, (1, 1)}(Polynom{Int}([1, 1, 1]))
